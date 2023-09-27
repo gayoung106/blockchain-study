@@ -1,12 +1,10 @@
 const Chain = require("./chain");
+const P2PServer = require("./p2p");
 
 function main() {
-  const chain = new Chain();
-  let i = 0;
-  while (i < 100) {
-    chain.mining();
-    i++;
-  }
+  const p2p = new P2PServer();
+
+  p2p.listen();
 }
 
 main();

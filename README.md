@@ -7,6 +7,7 @@
 ```
 npm install crypto-js merkle
 npm install bn.js
+npm install ws
 ```
 
 ### 9/26

@@ -150,16 +150,37 @@ class Chain {
    */
   isValidBlock(preBlock, newBlock) {
     //1은 genesisBlock을 의미하기 때문에, 유효성 검증을 할 필요 없음
-    if (preBlock.index === 1) return 1;
+    if (preBlock.index === 1) return true;
     //3가지 조건이 true여야 함
     return (
-      preBlock.index !== 1 &&
+      preBlock.index > 1 &&
       preBlock.hash === newBlock.previousHash &&
       Block.createBlockHash(newBlock) === newBlock.hash
     );
   }
   // 유효성 블록체인 검증
-  isValidBlockchain() {}
+  // 노드가 새로 만들어졌을때, 블록체인 값을 확인하는 역할
+  /**
+   *
+   * @param {Block[]} blocks
+   * @returns 유효하게 검증된 블록체인
+   */
+  isValidBlockchain(blocks) {
+    // 블록체인의 모든 블록에 접근
+    for (let i = 1; i < blocks.length; i++) {
+      //블락의 하나하나에 대한 index를 훑고 가겠어
+
+      //앞의 블록
+      let preBlock = blocks[i - 1];
+      // 그 다음 블록
+      let curBlock = blocks[i];
+      if (!this.isValidBlock(preBlock, curBlock)) {
+        //두개의 블락의 값을 비교(검증진행)
+
+        return false;
+      }
+    }
+  }
 }
 
 module.exports = Chain;
