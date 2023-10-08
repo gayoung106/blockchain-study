@@ -1,5 +1,6 @@
 const { BN } = require("bn.js");
 const Block = require("./block");
+const MessageType = require("./msg");
 
 class Chain {
   /**
@@ -21,19 +22,23 @@ class Chain {
    * @param {Block} block 블록
    */
   addBlock(block) {
-    //TODO block 유효성 검증을 진행해야함
     const lastBlock = this.getLastBlock();
-
+    // 블록 유효성 검증 진행
     if (this.isValidBlock(lastBlock, block)) {
       this.blocks.push(block);
+      return true;
     } else {
-      console.log("유효하지 않은 블록입니다.");
+      console.error("유효하지 않은 블록입니다");
+      return false;
     }
+  }
+  slowResolve() {
+    return new Promise((res) => setTimeout(res.bind(), 0));
   }
   /**
    * 채굴
    */
-  mining() {
+  async mining() {
     console.log("채굴 시작!");
     // 코인베이스 트랜잭션
     const coinbaseTx = { from: "COINBASE", to: "MINER", value: 50 };
@@ -52,6 +57,7 @@ class Chain {
     // 목표값과 해시값을 비교하여 해시퍼즐 정답을 만듦
     while (!(Block.createBlockHash(newBlock) <= target)) {
       newBlock.nonce++;
+      await this.slowResolve();
     }
     // 해시퍼즐 정답을 만든 해시를 기존 블록에 셋팅
     newBlock.hash = Block.createBlockHash(newBlock);
@@ -59,7 +65,7 @@ class Chain {
     console.log(newBlock);
     console.log("채굴 성공!");
     // 블록체인에 블록을 연결
-    this.addBlock(newBlock);
+    return newBlock;
   }
 
   /**
@@ -141,45 +147,79 @@ class Chain {
   getLastBlock() {
     return this.blocks[this.blocks.length - 1];
   }
-
   /**
-   *유효성 블록 검증
+   * 유효 블록 검증
    * @param {Block} preBlock
    * @param {Block} newBlock
-   * @returns
+   * @returns 유효한 블록 검증
    */
   isValidBlock(preBlock, newBlock) {
-    //1은 genesisBlock을 의미하기 때문에, 유효성 검증을 할 필요 없음
+    // 제네시스 블록은 통과
     if (preBlock.index === 1) return true;
-    //3가지 조건이 true여야 함
     return (
+      // 제네시스 블록이 아니어야함
       preBlock.index > 1 &&
+      // 새로운 블록의 이전해시와 이전블록의 해시가 같아야 함
       preBlock.hash === newBlock.previousHash &&
+      // 새로운 블록의 해시와 해시함수를 통해 해시가 같아야 함
       Block.createBlockHash(newBlock) === newBlock.hash
     );
   }
-  // 유효성 블록체인 검증
-  // 노드가 새로 만들어졌을때, 블록체인 값을 확인하는 역할
   /**
-   *
+   * 블록체인 유효성 검증
    * @param {Block[]} blocks
    * @returns 유효하게 검증된 블록체인
    */
   isValidBlockchain(blocks) {
     // 블록체인의 모든 블록에 접근
     for (let i = 1; i < blocks.length; i++) {
-      //블락의 하나하나에 대한 index를 훑고 가겠어
-
-      //앞의 블록
+      // 앞에 블록
       let preBlock = blocks[i - 1];
       // 그 다음 블록
       let curBlock = blocks[i];
+      // 두 블록을 검증 진행
       if (!this.isValidBlock(preBlock, curBlock)) {
-        //두개의 블락의 값을 비교(검증진행)
-
         return false;
       }
     }
+    return true;
+  }
+
+  handlChainReponse(receivedChain, ws) {
+    const isValidChain = this.isValidBlockchain(receivedChain);
+    if (!isValidChain) return false;
+
+    const isValid = this.replaceChain(receivedChain);
+    if (!isValid) return false;
+
+    const msg = {
+      type: MessageType.receivedChain,
+      payload: receivedChain,
+    };
+
+    ws.broadcast(msg);
+
+    return true;
+  }
+
+  // longest 체인 룰
+  replaceChain(receivedChain) {
+    const latestReceivedBlock = receivedChain[receivedChain.length - 1];
+    const lastBlock = this.getLastBlock();
+
+    if (latestReceivedBlock.index === 1) {
+      console.log("받은 최신 블록이 제네시스 블록입니다");
+      return false;
+    }
+
+    if (latestReceivedBlock.index <= lastBlock.index) {
+      console.log("자신의 블록이 더 길거나 같습니다");
+      return false;
+    }
+
+    this.blocks = receivedChain;
+
+    return true;
   }
 }
 
